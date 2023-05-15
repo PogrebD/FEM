@@ -10,18 +10,17 @@ public:
 	VectorB(Grid& _Grid)
 	{
 		GIGAGRID = &_Grid;
-		CalcB();
 	}
 
-	void CalcF(int i)
+	void CalcF(int i, double t)
 	{
 		for (int j = 0; j < 3; j++)
 		{
-			F[j] = FunctionBclass::FunctionB(GIGAGRID->Nodes[GIGAGRID->Elems[i].NodeIndex[j]].r, GIGAGRID->Nodes[GIGAGRID->Elems[i].NodeIndex[j]].z);
+			F[j] = FunctionBclass::FunctionB(GIGAGRID->Nodes[GIGAGRID->Elems[i].NodeIndex[j]].r, GIGAGRID->Nodes[GIGAGRID->Elems[i].NodeIndex[j]].z, t);
 		}
 	}
 
-	void CalcB()
+	void CalcB(double t)
 	{
 		B.resize(3);
 		for (int k = 0; k < GIGAGRID->Elems.size(); k++)
@@ -30,12 +29,12 @@ public:
 			{
 				B[i] = 0;
 			}
-			CalcF(k);
+			CalcF(k, t);
 			for (int i = 0; i < 3; i++)
 			{
 				for (int j = 0; j < 3 && i != j; j++)
 				{
-					B[i] += F[j] * GIGAGRID->Elems[k].MatrixMMMfinale[i][j]*GIGAGRID->Mats[GIGAGRID->Elems[k].MatIndex].gamma;
+					B[i] += F[j] * GIGAGRID->Elems[k].MatrixMMMfinale[i][j] * GIGAGRID->Mats[GIGAGRID->Elems[k].MatIndex].gamma;
 					B[j] += F[i] * GIGAGRID->Elems[k].MatrixMMMfinale[i][j] * GIGAGRID->Mats[GIGAGRID->Elems[k].MatIndex].gamma;
 				}
 				B[i] += F[i] * GIGAGRID->Elems[k].MatrixMMMfinale[i][i] * GIGAGRID->Mats[GIGAGRID->Elems[k].MatIndex].gamma;

@@ -8,7 +8,6 @@ public:
 	{
 		GIGAGLOBALMATRIX = &_GlobalMatrix;
 		n = Nnode;
-		MSG_no(Nnode);
 	}
 
 	vector<double> q;
@@ -19,6 +18,7 @@ public:
 		int k_iter;
 		int maxiter = 100000;
 		double e = 0.00000000001;
+		q.clear();
 		q.resize(Nnode);
 		double alpha, betta;
 		double rk_1_rk_1;

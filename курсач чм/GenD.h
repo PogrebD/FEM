@@ -1,6 +1,4 @@
 #pragma once
-#include <vector>
-#include <iostream>
 #include "Grid.h"
 
 using namespace std;
@@ -11,7 +9,6 @@ class GenD
 public:
 	void D(Grid& _Grid, int NElem)
 	{
-
 		D_1.resize(3);
 		for (int i = 0; i < 3; i++)
 		{

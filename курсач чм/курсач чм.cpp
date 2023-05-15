@@ -17,19 +17,18 @@
 #include "BC.h"
 #include "MSG.h"
 #include "Solve.h"
+#include "Operations.h"
 
-using namespace std;
+
 typedef double type;
-
-
+vector<vector<double>> qT;
+vector<double> q0, q_j1, b_j1, Mq_j1;
 int Nnode, NElem, NMat, Nbc2, Nbc3, Nbc1;
 Grid _Grid;
 vector<int> ig, jg;
 GenD _GenD;
 BC _BC;
 Solve _Solve;
-
-
 
 void Gen()
 {
@@ -62,7 +61,7 @@ void inputbc(BC& _BC, int& Nbc2, int& Nbc3, int& Nbc1)
 	_BC.BC1vector.resize(Nbc1);
 	for (int i = 0; i < Nbc1; i++)
 	{
-		fin1 >> _BC.BC1vector[i].versh[0] >> _BC.BC1vector[i].versh[1] >> _BC.BC1vector[i].U;
+		fin1 >> _BC.BC1vector[i].versh[0] >> _BC.BC1vector[i].versh[1];
 	}
 }
 
@@ -71,6 +70,7 @@ void InputGrid(Grid& _Grid, int& Nnode, int& NElem, int& NMat)
 	ifstream finN("Node.txt");
 	ifstream finE("Elem.txt");
 	ifstream finM("Mat.txt");
+	ifstream finT("Time.txt");
 	finN >> Nnode;
 	_Grid.Nodes.resize(Nnode);
 	for (size_t i = 0; i < Nnode; i++)
@@ -95,20 +95,110 @@ void InputGrid(Grid& _Grid, int& Nnode, int& NElem, int& NMat)
 	}
 	_Grid.height = _Grid.Nodes[_Grid.Elems[0].NodeIndex[2]].z - _Grid.Nodes[0].z;
 	_Grid.width = _Grid.Nodes[1].r - _Grid.Nodes[0].r;
+
+	_Grid._Time.Tparse();
 }
 
 int main()
 {
-
+	cout.imbue(std::locale("German_germany"));
+	vector<int> indx;
+	indx.resize(3);
 	Gen();
 	InputGrid(_Grid, Nnode, NElem, NMat);
-	_GenD.D(_Grid, NElem);
-	MatrixMG _MatrixMG(_Grid);
-	VectorB _VectorB(_Grid);
-	GlobalMatrix _GlobalMatrix(_Grid, NElem, Nnode);
 	inputbc(_BC, Nbc2, Nbc3, Nbc1);
-	_BC.primeniaemKraevble(_Grid, _GlobalMatrix, Nbc2, Nbc3, Nbc1, Nnode);
+	_GenD.D(_Grid, NElem);
+
+	q0.resize(Nnode);
+	q_j1.resize(Nnode);
+	b_j1.resize(Nnode);
+	Mq_j1.resize(Nnode);
+	for (int i = 0; i < Nnode; i++)
+	{
+		q0[i] = Cfg::U(_Grid.Nodes[i].r, _Grid.Nodes[i].z, _Grid._Time.timeSloy[0]);
+	}
+	qT.push_back(q0);
+	MatrixMG _MatrixMG(_Grid);
+
+	VectorB _VectorB(_Grid);
+	_VectorB.CalcB(_Grid._Time.timeSloy[0]);
+
+
+	GlobalMatrix _GlobalMatrix(_Grid, NElem, Nnode);
+	_GlobalMatrix.vstavkaB(_Grid, NElem);
+	_GlobalMatrix.vstavkaGM(_Grid, NElem);
+//	_BC.primeniaemKraevble1(_Grid, _GlobalMatrix, Nbc2, Nbc3, Nbc1, Nnode);
+
+	b_j1 = _GlobalMatrix.Globalvector;
+
+	vector<double> GlobalGMtriangleSave = _GlobalMatrix.GlobalGMtriangle;
+	vector<double> GlobalGMdiagSave = _GlobalMatrix.GlobalGMdiag;
+
+	_VectorB.CalcB(_Grid._Time.timeSloy[1]);
+	_GlobalMatrix.vstavkaB(_Grid, NElem);
+//	_BC.primeniaemKraevble1(_Grid, _GlobalMatrix, Nbc2, Nbc3, Nbc1, Nnode);
+
+	vector<double> buf1;
+	buf1.resize(Nnode);
+
+	buf1 = Operations::CumVectorVector(b_j1, _GlobalMatrix.Globalvector);
+	buf1 = Operations::MultVectoronValue(buf1, 0.5);
+	b_j1 = _GlobalMatrix.Globalvector;
+
+	for (int k = 0; k < NElem; k++)
+	{
+		vector<double> buf;
+		buf.resize(Nnode);
+		buf = Operations::Calc_q_j1({ _Grid.Elems[k].NodeIndex[0], _Grid.Elems[k].NodeIndex[1], _Grid.Elems[k].NodeIndex[2]}, _Grid.Elems[k].MatrixMMMfinale, _Grid.Elems[k].MatrixGGGfinale, q0, _Grid._Time.dt, Nnode, k);
+		Mq_j1 = Operations::CumVectorVector(Mq_j1, buf);
+	}
+	_GlobalMatrix.Globalvector = Operations::CumVectorVector(Mq_j1, buf1);
+
+	_BC.primeniaemKraevble1(_Grid, _GlobalMatrix, Nbc2, Nbc3, Nbc1, Nnode, 1);
+
 	SLAU _SLAU(_GlobalMatrix, Nnode);
+
+	_SLAU.MSG_no(Nnode);
+	q_j1 = _SLAU.q;
+	qT.push_back(q_j1);
+
+
+	for (int i = 2; i < _Grid._Time.Ntime + 1; i++)
+	{
+		Mq_j1.clear();
+		Mq_j1.resize(Nnode);
+		for (int k = 0; k < NElem; k++)
+		{
+			vector<double> buf;
+			buf.resize(Nnode);
+			buf = Operations::Calc_q_j1({ _Grid.Elems[k].NodeIndex[0], _Grid.Elems[k].NodeIndex[1], _Grid.Elems[k].NodeIndex[2] }, _Grid.Elems[k].MatrixMMMfinale, _Grid.Elems[k].MatrixGGGfinale, q_j1, _Grid._Time.dt, Nnode, k);
+			Mq_j1 = Operations::CumVectorVector(Mq_j1, buf);
+		}
+
+		_VectorB.CalcB(_Grid._Time.timeSloy[i]);
+		_GlobalMatrix.vstavkaB(_Grid, NElem);
+
+		buf1 = Operations::CumVectorVector(b_j1, _GlobalMatrix.Globalvector);
+		buf1 = Operations::MultVectoronValue(buf1, 0.5);
+		b_j1 = _GlobalMatrix.Globalvector;
+
+		_GlobalMatrix.Globalvector = Operations::CumVectorVector(Mq_j1, buf1);
+
+		_BC.primeniaemKraevble2(_Grid, _GlobalMatrix, GlobalGMtriangleSave, GlobalGMdiagSave, Nbc2, Nbc3, Nbc1, Nnode, i);
+
+		_SLAU.MSG_no(Nnode);
+		q_j1 = _SLAU.q;
+		qT.push_back(q_j1);
+		auto g = (double)_Grid._Time.Ntime / i;
+		if ((((double)_Grid._Time.Ntime / i) == 1) || (((double)_Grid._Time.Ntime / i) == 1.5) || (((double)_Grid._Time.Ntime / i) == 3))
+		{			
+			cout << setprecision(15) << q_j1[4] << endl;
+		}
+
+	}
+	cout << Cfg::U(453435, 2.5, _Grid._Time.timeSloy[10]) << endl << Cfg::U(453435, 2.5, _Grid._Time.timeSloy[20]) << endl << Cfg::U(453435, 2.5, _Grid._Time.timeSloy[30]) << endl;
+
+
 	_Solve.finale(_Grid, _SLAU);
 
 }

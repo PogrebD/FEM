@@ -2,8 +2,10 @@
 class FunctionBclass
 {
 public:
-	static double FunctionB(double r, double z)
+	static double FunctionB(double r, double z, double t)
 	{
-		return z;
+		return 2*t;
 	}
+
+
 };

@@ -10,9 +10,17 @@ public:
 		GlobalGMtriangle.resize(ig[Nnode - 1]);
 		GlobalGMdiag.resize(Nnode);
 		Globalvector.resize(Nnode);
-		vstavka(_Grid, NElem);
+		MGlobal.resize(Nnode);
+		GGlobal.resize(Nnode);
+		for (int i = 0; i < Nnode; i++)
+		{
+			GGlobal[i].resize(Nnode);
+			MGlobal[i].resize(Nnode);
+		}
+
 	}
 	vector<double> GlobalGMtriangle, GlobalGMdiag, Globalvector;
+	vector<vector<double>> MGlobal, GGlobal;
 	vector<int> ig, jg;
 	void portrait(Grid& _Grid, int NElem, int Nnode)
 	{
@@ -41,7 +49,21 @@ public:
 		}
 	}
 
-	void vstavka(Grid _Grid, int NElem)
+	//void vstavkaGM2(Grid _Grid, int NElem, int Nnode)
+	//{
+	//	for (int k = 0; k < NElem; k++)
+	//	{
+	//		for (int i = 0; i < 3; i++)
+	//		{
+	//			for (int j = 0; j < 3; j++)
+	//			{
+	//				MGlobal[i + k][j + k] += _Grid.Elems[k].MatrixMMMfinale[i][j];
+	//			}
+	//		}
+	//	}
+	//}
+
+	void vstavkaGM(Grid _Grid, int NElem)
 	{
 		for (int i = 0; i < NElem; i++)
 		{
@@ -52,11 +74,11 @@ public:
 		}
 		for (int i = 0; i < NElem; i++)
 		{
-			for (int k = ig[_Grid.Elems[i].NodeIndex[1]-1]; k < ig[_Grid.Elems[i].NodeIndex[1]]; k++)
+			for (int k = ig[_Grid.Elems[i].NodeIndex[1] - 1]; k < ig[_Grid.Elems[i].NodeIndex[1]]; k++)
 			{
-				if(jg[k] == _Grid.Elems[i].NodeIndex[0])
+				if (jg[k] == _Grid.Elems[i].NodeIndex[0])
 					GlobalGMtriangle[k] += _Grid.Elems[i].GIGAMATRIX[1][0];
-			}		
+			}
 			for (int j = 0; j < 2; j++)
 			{
 				for (int k = ig[_Grid.Elems[i].NodeIndex[2] - 1]; k < ig[_Grid.Elems[i].NodeIndex[2]]; k++)
@@ -68,6 +90,15 @@ public:
 				}
 			}
 		}
+
+	}
+
+	void vstavkaB(Grid _Grid, int NElem)
+	{
+		int n = Globalvector.size();
+		Globalvector.clear();
+		Globalvector.resize(n);
+
 		for (int i = 0; i < NElem; i++)
 		{
 			for (int j = 0; j < 3; j++)
